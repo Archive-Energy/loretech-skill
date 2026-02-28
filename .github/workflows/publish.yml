@@ -20,8 +20,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
 
       - run: npm install -g npm@latest
+
+      - name: Clean any stale auth config
+        run: |
+          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          rm -f "$NPM_CONFIG_USERCONFIG" 2>/dev/null || true
 
       - run: npm publish --access public
