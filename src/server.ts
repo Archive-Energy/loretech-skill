@@ -33,14 +33,34 @@ import {
 // Config
 // ---------------------------------------------------------------------------
 
+const ENV_KEYS = [
+  "LORETECH_API_KEY",
+  "OPENROUTER_API_KEY",
+  "EXA_API_KEY",
+  "DISPLAY_NAME",
+  "X_HANDLE",
+] as const;
+
 function loadEnv(): Record<string, string> {
-  const envPath = path.join(findLoretechDir(), ".env");
+  // 1. Read from .loretech/.env file (if found)
   const env: Record<string, string> = {};
-  if (!fs.existsSync(envPath)) return env;
-  for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
-    const match = line.match(/^([A-Z_]+)=(.+)$/);
-    if (match) env[match[1]] = match[2];
+  try {
+    const envPath = path.join(findLoretechDir(), ".env");
+    if (fs.existsSync(envPath)) {
+      for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+        const match = line.match(/^([A-Z_]+)=(.+)$/);
+        if (match) env[match[1]] = match[2];
+      }
+    }
+  } catch {
+    // findLoretechDir may throw — fall through to process.env
   }
+
+  // 2. process.env takes precedence (set via MCP config env block)
+  for (const key of ENV_KEYS) {
+    if (process.env[key]) env[key] = process.env[key];
+  }
+
   return env;
 }
 

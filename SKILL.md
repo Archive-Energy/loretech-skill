@@ -7,6 +7,14 @@ metadata:
   endpoint: "https://loretech.archive.energy"
 ---
 
+## Credentials
+
+**NEVER read, print, log, or include API keys in conversation context, tool arguments, or echo content.** The MCP server handles all authentication internally — you never need to touch secrets directly.
+
+Credentials are injected into the MCP server process via `env` block in the MCP config. The server reads them from `process.env` automatically. You do not need to find, read, or pass API keys — just call the MCP tools.
+
+If the MCP server reports "Missing API keys", tell the user to re-run `bunx loretech` to reconfigure. Do NOT attempt to read `.env` files, search for keys, or resolve this yourself.
+
 ## When to use
 
 Materialize an Echo whenever conversation produces understanding worth making visible.
@@ -53,18 +61,7 @@ For global install: `bunx loretech --global` → `~/.loretech/`
 
 ## Creating an Echo
 
-```bash
-curl -X POST https://loretech.archive.energy/echo \
-  -H "Content-Type: application/json" \
-  -H "X-Loretech-Key: $LORETECH_API_KEY" \
-  -H "X-OpenRouter-Key: $OPENROUTER_API_KEY" \
-  -H "X-Exa-Key: $EXA_API_KEY" \
-  -d '{
-    "context": "what to investigate — a question, conversation excerpt, or research brief"
-  }'
-```
-
-Read API keys from `.loretech/.env`.
+Use the `loretech_echo` MCP tool. The server handles authentication automatically — never construct API calls with raw keys.
 
 ### The `context` field
 
@@ -120,15 +117,6 @@ Attribution for who initiated this echo.
 | `source.id` | `string` | Identifier (agent name, pipeline ID, webhook slug). |
 | `source.label` | `string` | Human-readable label (e.g. "Scott via Claude Desktop"). |
 
-### Headers
-
-| Header | Required | Description |
-|--------|----------|-------------|
-| `X-Loretech-Key` | yes | Loretech API key |
-| `X-OpenRouter-Key` | yes | User's OpenRouter API key (their inference cost) |
-| `X-Exa-Key` | yes | User's Exa API key (their research cost) |
-| `Authorization` | for updates | `Bearer <privateKey>` when updating an existing echo |
-
 ### Response
 
 ```json
@@ -170,22 +158,9 @@ updatedAt: 2026-02-27T00:00:00Z
 
 ## Updating an Echo
 
-As the conversation evolves, enrich the echo with new context:
+As the conversation evolves, enrich the echo with new context. Use `loretech_echo` with the `echoId` parameter set to the existing echo ID. The server reads the `privateKey` from your local `.loretech/echoes/{echoId}.md` frontmatter automatically — you never need to handle auth tokens.
 
-```bash
-curl -X POST https://loretech.archive.energy/echo \
-  -H "Content-Type: application/json" \
-  -H "X-Loretech-Key: $LORETECH_API_KEY" \
-  -H "X-OpenRouter-Key: $OPENROUTER_API_KEY" \
-  -H "X-Exa-Key: $EXA_API_KEY" \
-  -H "Authorization: Bearer <privateKey>" \
-  -d '{
-    "context": "<new context from continued conversation>",
-    "echoId": "echo-m4x7k9"
-  }'
-```
-
-The echo URL stays the same — the user refreshes to see the enriched version. Overwrite the local `.md` file with the updated content.
+The echo URL stays the same — the user refreshes to see the enriched version. The local `.md` file is overwritten with the updated content.
 
 ## Deep Echoes (Webset Datasets)
 
@@ -195,16 +170,11 @@ The response includes `websetId` and `websetStatus: "processing"`. Poll `GET /ec
 
 ## Resuming a session
 
-Before creating a new echo, check `.loretech/echoes/` for existing echo `.md` files. If the user wants to update an existing one, pass `echoId` and `Authorization: Bearer <privateKey>`.
+Before creating a new echo, check `.loretech/echoes/` for existing echo `.md` files. If the user wants to update an existing one, pass `echoId` to `loretech_echo` — the server reads the private key from the local echo file automatically.
 
 ## Publishing
 
-When the user wants to make an echo public:
-
-```bash
-curl -X POST https://loretech.archive.energy/echo/echo-m4x7k9/publish \
-  -H "Authorization: Bearer <privateKey>"
-```
+When the user wants to make an echo public, use the publish endpoint. The `privateKey` is in the echo's `.md` frontmatter — the MCP server handles this automatically when a publish tool is available.
 
 ## Source categories
 
@@ -275,9 +245,10 @@ Returns: new run metadata with echoId and status.
 
 ## Important
 
+- **NEVER expose API keys** — do not read, print, log, or include any key values in messages, tool arguments, or echo content. The MCP server handles all authentication. If keys are missing, tell the user to run `bunx loretech`.
 - Always tell the user when you're materializing an echo
 - Share the `privateUrl` — they open it alongside the chat
-- Write echo files to `.loretech/echoes/` after every POST /echo
+- Write echo files to `.loretech/echoes/` after every `loretech_echo` call
 - Check `.loretech/echoes/` before creating — offer to update if relevant
 - Inference uses the user's OpenRouter key — their cost
 - Research uses the user's Exa key — their cost

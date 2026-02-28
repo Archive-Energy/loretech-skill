@@ -424,8 +424,14 @@ async function main() {
     console.log("    installed when you run this from a project directory.");
   }
 
-  // ── Register MCP server in Claude Desktop config ─────────────────────
-  registerMcpConfig();
+  // ── Register MCP server with credentials in env block ────────────────
+  const mcpEnvVars: Record<string, string> = {};
+  if (loretechKey) mcpEnvVars.LORETECH_API_KEY = loretechKey;
+  if (openrouterKey) mcpEnvVars.OPENROUTER_API_KEY = openrouterKey;
+  if (exaKey) mcpEnvVars.EXA_API_KEY = exaKey;
+  if (displayName) mcpEnvVars.DISPLAY_NAME = displayName;
+  if (xHandle) mcpEnvVars.X_HANDLE = xHandle;
+  registerMcpConfig(mcpEnvVars);
 
   // ── Done ─────────────────────────────────────────────────────────────
   const envLabel = isGlobal ? "~/.loretech/.env" : path.relative(process.cwd(), envFile) || ".loretech/.env";
@@ -456,28 +462,33 @@ async function main() {
 }
 
 /**
- * Register the Loretech MCP server in Claude Desktop's config.
- * Creates/updates ~/Library/Application Support/Claude/claude_desktop_config.json
+ * Register the Loretech MCP server in agent configs.
+ * Writes credentials into the env block so the server always has them.
  */
-function registerMcpConfig(): void {
-  const configPaths: string[] = [];
+function registerMcpConfig(envVars: Record<string, string>): void {
+  const mcpEntry = {
+    command: "bunx",
+    args: ["loretech", "serve"],
+    env: envVars,
+  };
 
-  // Claude Desktop
+  // --- Claude Desktop ---
+  const desktopConfigs: string[] = [];
   if (process.platform === "darwin") {
-    configPaths.push(
+    desktopConfigs.push(
       path.join(HOME, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
     );
   } else if (process.platform === "win32") {
-    configPaths.push(
+    desktopConfigs.push(
       path.join(process.env.APPDATA ?? "", "Claude", "claude_desktop_config.json"),
     );
   } else {
-    configPaths.push(
+    desktopConfigs.push(
       path.join(HOME, ".config", "claude", "claude_desktop_config.json"),
     );
   }
 
-  for (const configPath of configPaths) {
+  for (const configPath of desktopConfigs) {
     try {
       const configDir = path.dirname(configPath);
       fs.mkdirSync(configDir, { recursive: true });
@@ -488,10 +499,7 @@ function registerMcpConfig(): void {
       }
 
       const mcpServers = (config.mcpServers ?? {}) as Record<string, unknown>;
-      mcpServers.loretech = {
-        command: "bunx",
-        args: ["loretech", "serve"],
-      };
+      mcpServers.loretech = mcpEntry;
       config.mcpServers = mcpServers;
 
       fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
@@ -499,6 +507,26 @@ function registerMcpConfig(): void {
     } catch (err) {
       console.warn(`  ⚠ Could not register MCP config at ${configPath}: ${err instanceof Error ? err.message : err}`);
     }
+  }
+
+  // --- Claude Code (global settings) ---
+  try {
+    const claudeCodeConfig = path.join(HOME, ".claude", "settings.json");
+    fs.mkdirSync(path.dirname(claudeCodeConfig), { recursive: true });
+
+    let settings: Record<string, unknown> = {};
+    if (fs.existsSync(claudeCodeConfig)) {
+      settings = JSON.parse(fs.readFileSync(claudeCodeConfig, "utf-8"));
+    }
+
+    const mcpServers = (settings.mcpServers ?? {}) as Record<string, unknown>;
+    mcpServers.loretech = mcpEntry;
+    settings.mcpServers = mcpServers;
+
+    fs.writeFileSync(claudeCodeConfig, JSON.stringify(settings, null, 2), "utf-8");
+    console.log(`  ✓ MCP server registered in ${claudeCodeConfig}`);
+  } catch (err) {
+    console.warn(`  ⚠ Could not register Claude Code config: ${err instanceof Error ? err.message : err}`);
   }
 }
 
