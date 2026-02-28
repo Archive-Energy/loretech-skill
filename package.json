@@ -1,6 +1,6 @@
 {
   "name": "loretech",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Conversation materializer. Turns conversation context into living, enriched, shareable artifacts (Echoes).",
   "type": "module",
   "bin": {

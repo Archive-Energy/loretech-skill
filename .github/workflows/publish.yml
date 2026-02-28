@@ -23,4 +23,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ""
 
+      - run: npm install -g npm@latest
+
       - run: npm publish --access public
