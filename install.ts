@@ -359,69 +359,104 @@ async function main() {
     ? fs.readFileSync(skillMdPath, "utf-8")
     : "";
 
-  // 1. Install to .claude (primary)
-  const primaryDest = path.join(projectDir, SKILL_MD_PRIMARY);
-  try {
-    fs.mkdirSync(primaryDest, { recursive: true });
+  const refSrc = path.join(skillSrc, "references");
 
+  /**
+   * Write SKILL.md + references to a destination directory.
+   */
+  function installSkillTo(dest: string): void {
+    fs.mkdirSync(dest, { recursive: true });
     if (skillMdContent) {
-      fs.writeFileSync(path.join(primaryDest, "SKILL.md"), skillMdContent, "utf-8");
+      fs.writeFileSync(path.join(dest, "SKILL.md"), skillMdContent, "utf-8");
     }
-
-    const refSrc = path.join(skillSrc, "references");
     if (fs.existsSync(refSrc)) {
-      copyDir(refSrc, path.join(primaryDest, "references"));
+      copyDir(refSrc, path.join(dest, "references"));
     }
-
-    installedTo.push(SKILL_MD_PRIMARY);
-  } catch (err) {
-    console.warn(`  ⚠ Could not install to ${SKILL_MD_PRIMARY}: ${err instanceof Error ? err.message : err}`);
   }
 
-  // 2. Symlink .codex → .claude (avoid duplication)
-  const symlinkDest = path.join(projectDir, SKILL_MD_SYMLINK);
-  try {
-    fs.mkdirSync(path.dirname(symlinkDest), { recursive: true });
-    if (fs.existsSync(symlinkDest)) {
-      const stat = fs.lstatSync(symlinkDest);
-      if (stat.isSymbolicLink()) {
-        fs.unlinkSync(symlinkDest);
-      } else {
-        fs.rmSync(symlinkDest, { recursive: true });
-      }
-    }
-    fs.symlinkSync(
-      path.relative(path.dirname(symlinkDest), primaryDest),
-      symlinkDest,
-    );
-    installedTo.push(`${SKILL_MD_SYMLINK} → ${SKILL_MD_PRIMARY}`);
-  } catch (err) {
-    console.warn(`  ⚠ Could not symlink ${SKILL_MD_SYMLINK}: ${err instanceof Error ? err.message : err}`);
-  }
-
-  // 3. Rules-format agents (Cursor, Windsurf)
-  for (const { dir, file, format, label } of RULES_TARGETS) {
-    const dest = path.join(projectDir, dir);
+  /**
+   * Create a symlink at `link` pointing to `target`.
+   * Only if the parent directory already exists (don't create harness dirs).
+   */
+  function symlinkSkill(link: string, target: string, label: string): void {
+    if (!fs.existsSync(path.dirname(link))) return; // harness not installed
     try {
-      fs.mkdirSync(dest, { recursive: true });
-
-      const rulesContent = generateRulesFile(skillMdContent, format);
-      fs.writeFileSync(path.join(dest, file), rulesContent, "utf-8");
-
-      installedTo.push(`${dir}/${file} (${label})`);
+      if (fs.existsSync(link)) {
+        const stat = fs.lstatSync(link);
+        if (stat.isSymbolicLink()) fs.unlinkSync(link);
+        else fs.rmSync(link, { recursive: true });
+      }
+      fs.symlinkSync(
+        path.relative(path.dirname(link), target),
+        link,
+      );
+      installedTo.push(`${label} → global`);
     } catch (err) {
-      console.warn(`  ⚠ Could not install ${label} rules: ${err instanceof Error ? err.message : err}`);
+      console.warn(`  ⚠ Could not symlink ${label}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  // 1. Global install: ~/.claude/skills/loretech/ (canonical — always)
+  const globalSkillDir = path.join(HOME, SKILL_MD_PRIMARY);
+  try {
+    installSkillTo(globalSkillDir);
+    installedTo.push(`~/${SKILL_MD_PRIMARY} (global)`);
+  } catch (err) {
+    console.warn(`  ⚠ Could not install global skill: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // 2. Project-level install (if not --global and projectDir != HOME)
+  if (!isGlobal && projectDir !== HOME) {
+    const projectSkillDir = path.join(projectDir, SKILL_MD_PRIMARY);
+    try {
+      installSkillTo(projectSkillDir);
+      installedTo.push(SKILL_MD_PRIMARY);
+    } catch (err) {
+      console.warn(`  ⚠ Could not install to ${SKILL_MD_PRIMARY}: ${err instanceof Error ? err.message : err}`);
+    }
+
+    // Project-level symlinks for other harnesses
+    symlinkSkill(
+      path.join(projectDir, SKILL_MD_SYMLINK),
+      path.join(projectDir, SKILL_MD_PRIMARY),
+      SKILL_MD_SYMLINK,
+    );
+  }
+
+  // 3. Global symlinks: Codex + OpenClaw → ~/.claude/skills/loretech/
+  symlinkSkill(
+    path.join(HOME, SKILL_MD_SYMLINK),
+    globalSkillDir,
+    `~/${SKILL_MD_SYMLINK}`,
+  );
+  // OpenClaw already has ~/.openclaw/skills → ~/.claude/skills (covers it),
+  // but if that symlink is missing, create the specific skill link
+  const openclawSkillDir = path.join(HOME, ".openclaw", "skills", "loretech");
+  if (fs.existsSync(path.join(HOME, ".openclaw")) && !fs.existsSync(openclawSkillDir)) {
+    const openclawSkillsDir = path.join(HOME, ".openclaw", "skills");
+    if (!fs.existsSync(openclawSkillsDir) || !fs.lstatSync(openclawSkillsDir).isSymbolicLink()) {
+      symlinkSkill(openclawSkillDir, globalSkillDir, "~/.openclaw/skills/loretech");
+    }
+  }
+
+  // 4. Rules-format agents (Cursor, Windsurf) — project-level only
+  if (!isGlobal && projectDir !== HOME) {
+    for (const { dir, file, format, label } of RULES_TARGETS) {
+      const dest = path.join(projectDir, dir);
+      try {
+        fs.mkdirSync(dest, { recursive: true });
+        const rulesContent = generateRulesFile(skillMdContent, format);
+        fs.writeFileSync(path.join(dest, file), rulesContent, "utf-8");
+        installedTo.push(`${dir}/${file} (${label})`);
+      } catch (err) {
+        console.warn(`  ⚠ Could not install ${label} rules: ${err instanceof Error ? err.message : err}`);
+      }
     }
   }
 
   console.log();
-  if (installedTo.length) {
-    for (const t of installedTo) {
-      console.log(`  ✓ Installed to ${t}`);
-    }
-  } else {
-    console.log("  ℹ No agent directories detected — skill files will be");
-    console.log("    installed when you run this from a project directory.");
+  for (const t of installedTo) {
+    console.log(`  ✓ Installed to ${t}`);
   }
 
   // ── Register MCP server with credentials in env block ────────────────
