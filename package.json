@@ -1,6 +1,6 @@
 {
   "name": "loretech",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Conversation materializer. Turns conversation context into living, enriched, shareable artifacts (Echoes).",
   "type": "module",
   "bin": {
@@ -15,6 +15,10 @@
   ],
   "keywords": ["skill", "research", "echo", "agent", "claude", "codex", "mcp"],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Archive-Energy/loretech-skill"
+  },
   "scripts": {
     "typecheck": "bunx tsc --noEmit",
     "test": "vitest run",
