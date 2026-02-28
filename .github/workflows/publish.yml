@@ -11,18 +11,28 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
-        env:
-          NODE_AUTH_TOKEN: ""
+          node-version: 22
 
-      - run: npm install -g npm@latest
+      - name: Publish via OIDC
+        run: |
+          # Upgrade npm for OIDC support (requires >= 11.5.1)
+          npm install -g npm@latest
 
-      - run: npm publish --access public
+          echo "Node: $(node --version)"
+          echo "npm: $(npm --version)"
+          echo "OIDC available: $([ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && echo yes || echo no)"
+
+          # Remove any .npmrc files with stale auth tokens
+          rm -f ~/.npmrc .npmrc
+          [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && rm -f "$NPM_CONFIG_USERCONFIG" || true
+          unset NODE_AUTH_TOKEN NPM_TOKEN NPM_CONFIG_USERCONFIG
+
+          npm publish --provenance --access public
