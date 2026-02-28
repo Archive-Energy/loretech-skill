@@ -4,17 +4,17 @@
  * LORETECH CLI
  *
  * Usage:
- *   bunx loretech init            # project-level install (default)
- *   bunx loretech init --global   # global (~/.loretech/)
- *   bunx loretech serve           # start MCP server (stdio transport)
+ *   bunx loretech              # onboard (or start server if already installed)
+ *   bunx loretech --global     # global install (~/.loretech/)
+ *   bunx loretech serve        # start MCP server (stdio transport)
  *
- * init:
- * 1. Creates .loretech/ in cwd (or ~/.loretech/ with --global)
- * 2. Prompts for OpenRouter + Exa API keys → .loretech/.env
- * 3. Creates .loretech/echoes/ + .loretech/runs/ for artifacts
- * 4. Installs SKILL.md into agent directories
- * 5. Registers MCP server in Claude Desktop config
- * 6. Adds .loretech/.env to .gitignore
+ * Onboarding:
+ * 1. Prompts: project location → display name → API keys → provision key → verify X (optional)
+ * 2. Creates .loretech/.env (gitignored) + echoes/ + runs/
+ * 3. Installs SKILL.md into agent directories
+ * 4. Registers MCP server in Claude Desktop config
+ *
+ * If already installed (cwd has .loretech/.env), starts the MCP server.
  *
  * serve:
  * Starts the Loretech MCP server on stdio transport.
@@ -157,25 +157,39 @@ function ensureGitignore(projectRoot: string): void {
 }
 
 async function main() {
-  const loretechDir = resolveLoretech();
-  const scope = isGlobal ? "global (~/.loretech)" : "project (.loretech/)";
-
   console.log();
-  console.log("  ╔══════════════════════════════════╗");
-  console.log("  ║         LORETECH  INSTALL         ║");
-  console.log("  ╚══════════════════════════════════╝");
+  console.log("  ██╗      ██████╗ ██████╗ ███████╗████████╗███████╗ ██████╗██╗  ██╗");
+  console.log("  ██║     ██╔═══██╗██╔══██╗██╔════╝╚══██╔══╝██╔════╝██╔════╝██║  ██║");
+  console.log("  ██║     ██║   ██║██████╔╝█████╗     ██║   █████╗  ██║     ███████║");
+  console.log("  ██║     ██║   ██║██╔══██╗██╔══╝     ██║   ██╔══╝  ██║     ██╔══██║");
+  console.log("  ███████╗╚██████╔╝██║  ██║███████╗   ██║   ███████╗╚██████╗██║  ██║");
+  console.log("  ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝");
   console.log();
-  console.log("  LORETECH materializes conversation into living artifacts (Echoes).");
+  console.log("  Materialize conversation into living artifacts (Echoes).");
   console.log("  Context in, persistent enriched artifact out — shareable at a URL.");
   console.log();
-  console.log(`  Installing to: ${scope}`);
-  console.log();
-  console.log("  You need two API keys (your keys, your cost):");
-  console.log("  • OpenRouter — for inference (openrouter.ai/keys)");
-  console.log("  • Exa        — for deep research (dashboard.exa.ai)");
+
+  // ── Project location ─────────────────────────────────────────────────
+  let projectDir: string;
+  if (isGlobal) {
+    projectDir = HOME;
+  } else {
+    const locationInput = await prompt(`  Where should we set up? (${process.cwd()}): `);
+    projectDir = locationInput
+      ? path.resolve(locationInput.replace(/^~/, HOME))
+      : process.cwd();
+  }
+
+  const loretechDir = isGlobal
+    ? path.join(HOME, ".loretech")
+    : path.join(projectDir, ".loretech");
+
+  const scope = isGlobal ? "global (~/.loretech)" : loretechDir;
+  console.log(`  → ${scope}`);
   console.log();
 
   // ── Check for existing config ────────────────────────────────────────
+  fs.mkdirSync(projectDir, { recursive: true });
   fs.mkdirSync(loretechDir, { recursive: true });
   const envFile = path.join(loretechDir, ".env");
   const existingEnv: Record<string, string> = {};
@@ -190,7 +204,19 @@ async function main() {
     console.log();
   }
 
+  // ── Display name ────────────────────────────────────────────────────
+  const displayName =
+    existingEnv.DISPLAY_NAME ||
+    (await prompt("  Display name: "));
+
+  console.log();
+
   // ── Prompt for keys ──────────────────────────────────────────────────
+  console.log("  You need two API keys (your keys, your cost):");
+  console.log("  • OpenRouter — for inference (openrouter.ai/keys)");
+  console.log("  • Exa        — for deep research (dashboard.exa.ai)");
+  console.log();
+
   const openrouterKey =
     existingEnv.OPENROUTER_API_KEY ||
     (await prompt("  OpenRouter API key: "));
@@ -204,7 +230,7 @@ async function main() {
     process.exit(1);
   }
 
-  // ── Provision Loretech API key ──────────────────────────────────────
+  // ── Provision Loretech API key (before X verification — needed for tagging) ──
   const LORETECH_API = "https://loretech.archive.energy";
   let loretechKey = existingEnv.LORETECH_API_KEY ?? "";
 
@@ -226,7 +252,7 @@ async function main() {
         console.log("  Opening payment page...");
         openBrowser(data.checkoutUrl);
         console.log();
-        console.log("  Complete checkout, then re-run: bunx loretech init");
+        console.log("  Complete checkout, then re-run: bunx loretech");
         console.log("  Your API key will be issued after payment.");
         process.exit(0);
       } else {
@@ -237,11 +263,71 @@ async function main() {
     }
   }
 
+  // ── Verify X account (optional — requires loretech key) ─────────────
+  let xHandle = existingEnv.X_HANDLE || "";
+
+  if (!xHandle && loretechKey) {
+    console.log();
+    const verifyX = await prompt("  Verify X account? [y/N]: ");
+    if (verifyX.toLowerCase() === "y") {
+      try {
+        const startRes = await fetch(`${LORETECH_API}/auth/x/start`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Loretech-Key": loretechKey,
+          },
+        });
+
+        if (startRes.ok) {
+          const { url, state } = await startRes.json() as { url: string; state: string };
+          openBrowser(url);
+          process.stdout.write("  Waiting for verification...");
+
+          // Poll for result (2s interval, 5 min timeout)
+          let verified = false;
+          for (let i = 0; i < 150; i++) {
+            await new Promise((r) => setTimeout(r, 2000));
+            try {
+              const statusRes = await fetch(`${LORETECH_API}/auth/x/status?state=${state}`);
+              const data = await statusRes.json() as { status: string; xHandle?: string };
+              if (data.status === "verified" && data.xHandle) {
+                xHandle = data.xHandle;
+                console.log(` ✓ Verified as ${xHandle}`);
+                verified = true;
+                break;
+              }
+            } catch {
+              // Network hiccup — keep polling
+            }
+          }
+
+          if (!verified) {
+            console.log(" timed out");
+            console.log("  ⚠ Verification did not complete. You can retry later with: bunx loretech");
+          }
+        } else {
+          const err = await startRes.json().catch(() => ({})) as { error?: string };
+          if (startRes.status === 404) {
+            console.log("  ℹ X verification not available on this engine (OAuth not configured)");
+          } else {
+            console.log(`  ⚠ Could not start X verification: ${err.error ?? startRes.statusText}`);
+          }
+        }
+      } catch {
+        console.log("  ⚠ Could not reach engine for X verification");
+      }
+    }
+  }
+
   // ── Write config ─────────────────────────────────────────────────────
-  const envLines = [
+  const envLines: string[] = [];
+  if (displayName) envLines.push(`DISPLAY_NAME=${displayName}`);
+  if (xHandle) envLines.push(`X_HANDLE=${xHandle}`);
+  envLines.push(
     `OPENROUTER_API_KEY=${openrouterKey}`,
     `EXA_API_KEY=${exaKey}`,
-  ];
+  );
   if (loretechKey) {
     envLines.push(`LORETECH_API_KEY=${loretechKey}`);
   }
@@ -250,7 +336,7 @@ async function main() {
 
   fs.writeFileSync(envFile, envContent, "utf-8");
   console.log();
-  console.log(`  ✓ Keys saved to ${envFile}`);
+  console.log(`  ✓ Config saved to ${envFile}`);
 
   // ── Create echoes + runs directories ─────────────────────────────────
   fs.mkdirSync(path.join(loretechDir, "echoes"), { recursive: true });
@@ -260,13 +346,12 @@ async function main() {
 
   // ── Add .env to .gitignore (project-level only) ─────────────────────
   if (!isGlobal) {
-    ensureGitignore(process.cwd());
+    ensureGitignore(projectDir);
     console.log("  ✓ Added .loretech/.env to .gitignore");
   }
 
   // ── Install skill into agent directories ─────────────────────────────
   const skillSrc = path.resolve(import.meta.dirname ?? path.dirname(new URL(import.meta.url).pathname));
-  const cwd = process.cwd();
   const installedTo: string[] = [];
 
   const skillMdPath = path.join(skillSrc, "SKILL.md");
@@ -275,7 +360,7 @@ async function main() {
     : "";
 
   // 1. Install to .claude (primary)
-  const primaryDest = path.join(cwd, SKILL_MD_PRIMARY);
+  const primaryDest = path.join(projectDir, SKILL_MD_PRIMARY);
   try {
     fs.mkdirSync(primaryDest, { recursive: true });
 
@@ -294,11 +379,9 @@ async function main() {
   }
 
   // 2. Symlink .codex → .claude (avoid duplication)
-  const symlinkDest = path.join(cwd, SKILL_MD_SYMLINK);
+  const symlinkDest = path.join(projectDir, SKILL_MD_SYMLINK);
   try {
-    // Ensure parent dir exists
     fs.mkdirSync(path.dirname(symlinkDest), { recursive: true });
-    // Remove existing if it's not already correct
     if (fs.existsSync(symlinkDest)) {
       const stat = fs.lstatSync(symlinkDest);
       if (stat.isSymbolicLink()) {
@@ -307,7 +390,6 @@ async function main() {
         fs.rmSync(symlinkDest, { recursive: true });
       }
     }
-    // Relative symlink from .codex/skills/loretech → ../../.claude/skills/loretech
     fs.symlinkSync(
       path.relative(path.dirname(symlinkDest), primaryDest),
       symlinkDest,
@@ -317,9 +399,9 @@ async function main() {
     console.warn(`  ⚠ Could not symlink ${SKILL_MD_SYMLINK}: ${err instanceof Error ? err.message : err}`);
   }
 
-  // 2. Rules-format agents (Cursor, Windsurf)
+  // 3. Rules-format agents (Cursor, Windsurf)
   for (const { dir, file, format, label } of RULES_TARGETS) {
-    const dest = path.join(cwd, dir);
+    const dest = path.join(projectDir, dir);
     try {
       fs.mkdirSync(dest, { recursive: true });
 
@@ -346,14 +428,17 @@ async function main() {
   registerMcpConfig();
 
   // ── Done ─────────────────────────────────────────────────────────────
-  const envLabel = isGlobal ? "~/.loretech/.env" : ".loretech/.env";
+  const envLabel = isGlobal ? "~/.loretech/.env" : path.relative(process.cwd(), envFile) || ".loretech/.env";
+  const cdHint = projectDir !== process.cwd()
+    ? `  │  cd ${path.relative(process.cwd(), projectDir).padEnd(43)}│\n`
+    : "";
   console.log();
   console.log("  ┌─────────────────────────────────────────────────┐");
   console.log("  │                                                 │");
   console.log("  │  LORETECH installed.                            │");
   console.log("  │                                                 │");
   console.log("  │  MCP server registered — your agent now has:    │");
-  console.log("  │  • loretech_echo     Materialize echoes          │");
+  console.log("  │  • loretech_echo     Materialize echoes         │");
   console.log("  │  • loretech_runs     List pipeline runs         │");
   console.log("  │  • loretech_inspect  Read run artifacts         │");
   console.log("  │  • loretech_rerun    Replay from any step       │");
@@ -361,8 +446,8 @@ async function main() {
   console.log(`  │  Keys: ${envLabel.padEnd(40)}│`);
   console.log(`  │  API key: ${loretechKey ? "✓ provisioned" : "⚠ missing"}                           │`);
   console.log("  │                                                 │");
-  console.log("  │  Runs materialize at: .loretech/runs/{id}/      │");
-  console.log("  │  Echoes saved to:     .loretech/echoes/{id}.md  │");
+  if (cdHint) process.stdout.write(cdHint);
+  console.log("  │  Then launch your agent: claude (or codex)      │");
   console.log("  │                                                 │");
   console.log("  └─────────────────────────────────────────────────┘");
   console.log();
@@ -424,7 +509,7 @@ function registerMcpConfig(): void {
 const command = process.argv[2];
 
 if (command === "serve") {
-  // Start MCP server (stdio transport)
+  // Explicit serve command
   import("./src/server.js")
     .then((mod) => mod.startServer())
     .catch((err) => {
@@ -432,6 +517,16 @@ if (command === "serve") {
       process.exit(1);
     });
 } else {
-  // Default: run installer (handles both "init" and no-arg)
-  main();
+  // Check if already installed — if so, start server instead of re-onboarding
+  const cwdEnv = path.join(process.cwd(), ".loretech", ".env");
+  if (!command && !isGlobal && fs.existsSync(cwdEnv)) {
+    import("./src/server.js")
+      .then((mod) => mod.startServer())
+      .catch((err) => {
+        console.error("Failed to start MCP server:", err);
+        process.exit(1);
+      });
+  } else {
+    main();
+  }
 }

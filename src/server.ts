@@ -156,7 +156,7 @@ server.registerTool(
         content: [
           {
             type: "text" as const,
-            text: "Missing API keys. Run `bunx loretech init` to configure.",
+            text: "Missing API keys. Run `bunx loretech` to configure.",
           },
         ],
         isError: true,
@@ -207,6 +207,9 @@ server.registerTool(
         "X-OpenRouter-Key": openrouterKey,
         "X-Exa-Key": exaKey,
       };
+
+      if (env.DISPLAY_NAME) headers["X-Display-Name"] = env.DISPLAY_NAME;
+      if (env.X_HANDLE) headers["X-Handle"] = env.X_HANDLE;
 
       // If updating, add auth
       if (args.echoId) {
@@ -546,7 +549,7 @@ server.registerTool(
         content: [
           {
             type: "text" as const,
-            text: "Missing API keys. Run `bunx loretech init` to configure.",
+            text: "Missing API keys. Run `bunx loretech` to configure.",
           },
         ],
         isError: true,

@@ -41,7 +41,7 @@ The echo persists. Share the URL. Come back later — it may have evolved as new
 
 ## Setup
 
-Run `bunx loretech init` in the project directory. This creates:
+Run `bunx loretech` in the project directory. This creates:
 
 ```
 .loretech/
@@ -49,7 +49,7 @@ Run `bunx loretech init` in the project directory. This creates:
 └── echoes/     # echo .md files
 ```
 
-For global install: `bunx loretech init --global` → `~/.loretech/`
+For global install: `bunx loretech --global` → `~/.loretech/`
 
 ## Creating an Echo
 
