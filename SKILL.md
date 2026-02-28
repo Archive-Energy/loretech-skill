@@ -4,7 +4,7 @@ description: Conversation materializer. Turns conversation context into living, 
 metadata:
   version: "0.5.0"
   author: "loretech"
-  endpoint: "https://loretech.archive.energy"
+  app: "https://loretech.archive.energy"
 ---
 
 ## Credentials
