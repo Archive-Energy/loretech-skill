@@ -492,8 +492,6 @@ async function main() {
   console.log("  │                                                 │");
   console.log("  └─────────────────────────────────────────────────┘");
   console.log();
-
-  openBrowser("https://loretech.archive.energy");
 }
 
 /**

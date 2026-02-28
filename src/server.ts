@@ -11,6 +11,7 @@
  */
 
 
+import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -66,6 +67,16 @@ function loadEnv(): Record<string, string> {
 
 const LORETECH_API =
   process.env.LORETECH_API_URL ?? "https://fast-raspy-monitor.mastra.cloud";
+
+function openBrowser(url: string): void {
+  const cmd =
+    process.platform === "darwin"
+      ? "open"
+      : process.platform === "win32"
+        ? "start"
+        : "xdg-open";
+  execFile(cmd, [url], () => {});
+}
 
 // ---------------------------------------------------------------------------
 // Webset dataset polling — runs in background after echo creation.
@@ -319,6 +330,9 @@ server.registerTool(
       }
 
       completeRun(runId, { echoId: data.echoId });
+
+      // Open the echo in the user's browser
+      openBrowser(data.privateUrl);
 
       // Build response
       const tagLine = data.tags.length ? `\nTags: ${data.tags.join(", ")}` : "";
@@ -692,6 +706,8 @@ server.registerTool(
       );
 
       completeRun(newRunId, { echoId: data.echoId });
+
+      openBrowser(data.privateUrl);
 
       return {
         content: [
