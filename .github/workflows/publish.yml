@@ -11,21 +11,16 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
-
-      - run: npm install -g npm@latest
-
-      - name: Clean any stale auth config
-        run: |
-          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
-          rm -f "$NPM_CONFIG_USERCONFIG" 2>/dev/null || true
+          node-version: lts/*
+        env:
+          NODE_AUTH_TOKEN: ""
 
       - run: npm publish --access public
