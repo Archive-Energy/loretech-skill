@@ -1,14 +1,15 @@
 {
   "name": "loretech",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "description": "Conversation materializer. Turns conversation context into living, enriched, shareable artifacts (Echoes).",
   "type": "module",
   "bin": {
-    "loretech": "./install.ts"
+    "loretech": "./bin/loretech.js"
   },
   "files": [
     "SKILL.md",
     "install.ts",
+    "bin/",
     "src/",
     "references/"
   ],
