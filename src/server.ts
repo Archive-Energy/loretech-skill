@@ -45,7 +45,7 @@ function loadEnv(): Record<string, string> {
 }
 
 const LORETECH_API =
-  process.env.LORETECH_API_URL ?? "https://loretech.archive.energy";
+  process.env.LORETECH_API_URL ?? "https://fast-raspy-monitor.mastra.cloud";
 
 // ---------------------------------------------------------------------------
 // Webset dataset polling — runs in background after echo creation.

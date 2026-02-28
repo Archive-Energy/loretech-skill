@@ -231,7 +231,7 @@ async function main() {
   }
 
   // ── Provision Loretech API key (before X verification — needed for tagging) ──
-  const LORETECH_API = "https://loretech.archive.energy";
+  const LORETECH_API = "https://fast-raspy-monitor.mastra.cloud";
   let loretechKey = existingEnv.LORETECH_API_KEY ?? "";
 
   if (!loretechKey) {
@@ -452,7 +452,7 @@ async function main() {
   console.log("  └─────────────────────────────────────────────────┘");
   console.log();
 
-  openBrowser("https://loretech.archive.energy/feed");
+  openBrowser("https://loretech.archive.energy");
 }
 
 /**
